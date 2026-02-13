@@ -91,10 +91,21 @@
   ansible.builtin.set_fact:
     post_update_kernel: "{{ ansible_kernel }}"
 
-- name: "ubuntu | Reboot the system if kernel was updated"
+- name: "ubuntu | Reboot the system if kernel was updated (standard reboot)"
   ansible.builtin.reboot:
     reboot_timeout: 300
-  when: os_info_pre_update.kernel_version != post_update_kernel
+  when:
+    - os_info_pre_update.kernel_version != post_update_kernel
+    - inventory_hostname != '10.0.1.6'
+  become: yes
+
+- name: "ubuntu | Reboot the system if kernel was updated (safe async reboot for Semaphore host)"
+  ansible.builtin.shell: sleep 5 && reboot
+  async: 1
+  poll: 0
+  when:
+    - os_info_pre_update.kernel_version != post_update_kernel
+    - inventory_hostname == '10.0.1.6'
   become: yes
 
 #- block:
