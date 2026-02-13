@@ -59,7 +59,7 @@
 
 - block:
   - name: "ubuntu | Nothing to upgrade"
-    ansible.builtin.msg:
+    ansible.builtin.debug:
       msg: "No packages were upgraded on {{ inventory_hostname }}"
     when: apt_result is defined and apt_result.changed == false
 
