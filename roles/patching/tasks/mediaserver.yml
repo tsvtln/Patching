@@ -1,0 +1,191 @@
+---
+- name: "mediaserver | Set pre-update os_info"
+  ansible.builtin.set_fact:
+    os_info_pre_update:
+      distribution: "{{ ansible_distribution }}"
+      distribution_major_version: "{{ ansible_distribution_major_version }}"
+      distribution_version: "{{ ansible_distribution_version }}"
+      distribution_release: "{{ ansible_distribution_release }}"
+      kernel_version: "{{ ansible_kernel }}"
+
+- name: "mediaserver | Return service state information"
+  ansible.builtin.service_facts:
+
+- name: "mediaserver | Display service list"
+  ansible.builtin.debug:
+    msg: "Service list: {{ ansible_facts.services.keys() }}"
+
+- name: "mediaserver | Collect a list of mounted devices"
+  ansible.builtin.set_fact:
+    dvs: "{{ ansible_mounts | map(attribute='device') | list }}"
+
+- name: "mediaserver | Register all system interfaces"
+  ansible.builtin.debug:
+    msg: "{{ item }}"
+  loop: "{{ ansible_interfaces }}"
+  when:
+    - hostvars[inventory_hostname]['ansible_%s' | format(item)]['ipv4'] is defined
+    - hostvars[inventory_hostname]['ansible_%s' | format(item)]['active'] == true
+    - hostvars[inventory_hostname]['ansible_%s' | format(item)]['device'] != 'lo'
+  register: NIC_interface
+
+- name: "mediaserver | Get the IP address for each interface"
+  ansible.builtin.debug:
+    msg: "{{ hostvars[inventory_hostname]['ansible_%s' | format(item.item)]['ipv4']['address'] }}"
+  loop: "{{ NIC_interface['results'] }}"
+  when: item.skip_reason is not defined
+  register: NIC_IP
+
+# Run updates
+- name: "mediaserver | Update and upgrade the system"
+  ansible.builtin.apt:
+    update_cache: yes
+  become: yes
+
+- name: "mediaserver | Install latest apt packages"
+  ansible.builtin.apt:
+    name: '*'
+    state: latest
+  when: confirm_update
+  register: apt_result
+  become: yes
+
+- name: "mediaserver | Check for zabbix package updates"
+  ansible.builtin.shell: apt-cache policy zabbix-server 2>/dev/null | grep -q "Installed:" && echo "found" || echo "not_found"
+  register: zabbix_check
+  changed_when: false
+  failed_when: false
+  become: yes
+
+- name: "mediaserver | Determine if zabbix was updated"
+  ansible.builtin.set_fact:
+    zabbix_updated: "{{ apt_result is defined and apt_result.changed and zabbix_check.stdout == 'found' }}"
+
+- name: "mediaserver | Display zabbix update status"
+  ansible.builtin.debug:
+    msg: "Zabbix packages were {{ 'updated' if zabbix_updated | default(false) else 'not updated' }}"
+
+- name: "mediaserver | Upgrade the kernel"
+  ansible.builtin.apt:
+    upgrade: dist
+  become: yes
+
+- block:
+  - name: "mediaserver | Log if apt update fails"
+    ansible.builtin.debug:
+      msg: "APT update failed on {{ ansible_hostname }} ({{ inventory_hostname }})"
+    when: apt_result is defined and apt_result.failed
+
+- block:
+  - name: "mediaserver | Nothing to upgrade"
+    ansible.builtin.debug:
+      msg: "No packages were upgraded on {{ ansible_hostname }} ({{ inventory_hostname }})"
+    when: apt_result is defined and apt_result.changed == false
+
+- block:
+  - name: "mediaserver | Update is done"
+    ansible.builtin.debug:
+      msg: "HOSTNAME: {{ ansible_hostname }} ({{ inventory_hostname }}) - Update is done"
+    changed_when: true
+  when: apt_result is defined and apt_result is succeeded and apt_result.changed
+
+# Zabbix-specific configuration handling
+- block:
+  - name: "mediaserver | Backup current zabbix_server.conf"
+    ansible.builtin.copy:
+      src: /etc/zabbix/zabbix_server.conf
+      dest: /etc/zabbix/zabbix_server.conf.bak
+      remote_src: yes
+      mode: '0600'
+      owner: root
+      group: root
+    become: yes
+
+  - name: "mediaserver | Copy zabbix_server.conf from backup location"
+    ansible.builtin.copy:
+      src: /home/potkor/trash/zabbix_server.conf
+      dest: /etc/zabbix/zabbix_server.conf
+      remote_src: yes
+      mode: '0600'
+      owner: root
+      group: root
+    become: yes
+
+  - name: "mediaserver | Restart zabbix-server service"
+    ansible.builtin.systemd:
+      name: zabbix-server.service
+      state: restarted
+    become: yes
+
+  - name: "mediaserver | Wait for zabbix-server to be ready"
+    ansible.builtin.wait_for:
+      timeout: 10
+
+  - name: "mediaserver | Run fix_zbx_mon_perms.sh script"
+    ansible.builtin.shell: /home/potkor/scripts/fix_zbx_mon_perms.sh
+    args:
+      chdir: /home/potkor/scripts
+    become: yes
+    register: zbx_script_result
+
+  - name: "mediaserver | Display fix_zbx_mon_perms.sh output"
+    ansible.builtin.debug:
+      msg: "{{ zbx_script_result.stdout_lines }}"
+    when: zbx_script_result.stdout_lines is defined
+
+  when: zabbix_updated | default(false)
+
+- name: "mediaserver | Trigger ansible handlers"
+  ansible.builtin.meta: flush_handlers
+
+- name: "mediaserver | Gather facts after update"
+  ansible.builtin.setup:
+    filter: ansible_kernel
+
+- name: "mediaserver | Set post-update kernel info"
+  ansible.builtin.set_fact:
+    post_update_kernel: "{{ ansible_kernel }}"
+
+- name: "mediaserver | Reboot the system if kernel was updated"
+  ansible.builtin.reboot:
+    reboot_timeout: 300
+  when: os_info_pre_update.kernel_version != post_update_kernel
+  become: yes
+
+- block:
+  - name: "mediaserver | Validate FS is mounted"
+    ansible.builtin.shell: df -hP | grep "{{ item }}" || true
+    changed_when: false
+    failed_when: false
+    register: fs_checked
+    loop: "{{ dvs }}"
+    when: "'/dev/loop' not in item and '/dev/snap' not in item"
+
+- name: "mediaserver | Gather complete facts after update and reboot"
+  ansible.builtin.setup:
+    filter: ansible_distribution*
+
+- name: "mediaserver | Set post-update os_info"
+  ansible.builtin.set_fact:
+    os_info_post_update:
+      distribution: "{{ ansible_distribution }}"
+      distribution_major_version: "{{ ansible_distribution_major_version }}"
+      distribution_release: "{{ ansible_distribution_release }}"
+      distribution_version: "{{ ansible_distribution_version }}"
+      kernel_version: "{{ ansible_kernel }}"
+
+- name: "mediaserver | Display post update OS version information"
+  ansible.builtin.debug:
+    msg: |
+      HOSTNAME: {{ ansible_hostname }} (IP: {{ inventory_hostname }}) versions after the update:
+          Distribution: {{ os_info_post_update.distribution }}
+          Distribution Major Version: {{ os_info_post_update.distribution_major_version }}
+          Distribution Release: {{ os_info_post_update.distribution_release }}
+          Distribution Version: {{ os_info_post_update.distribution_version }}
+          Kernel Version: {{ os_info_post_update.kernel_version }}
+
+- name: "mediaserver | Run post-update cleanup"
+  ansible.builtin.apt:
+    autoremove: yes
+    autoclean: yes
+  become: yes

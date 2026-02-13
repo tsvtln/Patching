@@ -129,7 +129,7 @@
 - name: "ubuntu | Display post update OS version information"
   ansible.builtin.debug:
     msg: |
-      HOSTNAME: {{ ansible_hostname }} (IP: {{ inventory_hostname }}) version After the update:
+      HOSTNAME: {{ ansible_hostname }} (IP: {{ inventory_hostname }}) versions after the update:
           Distribution: {{ os_info_post_update.distribution }}
           Distribution Major Version: {{ os_info_post_update.distribution_major_version }}
           Distribution Release: {{ os_info_post_update.distribution_release }}
