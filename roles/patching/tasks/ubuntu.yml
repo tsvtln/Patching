@@ -42,6 +42,12 @@
     update_cache: yes
   become: yes
 
+- name: "ubuntu | Get list of upgradable packages"
+  ansible.builtin.shell: apt list --upgradable 2>/dev/null | grep -v "^Listing" || echo "No upgradable packages"
+  register: upgradable_packages
+  changed_when: false
+  become: yes
+
 - name: "ubuntu | Install latest apt packages"
   ansible.builtin.apt:
     name: '*'
@@ -141,3 +147,22 @@
     autoremove: yes
     autoclean: yes
   become: yes
+
+- name: "ubuntu | Display upgraded packages summary"
+  ansible.builtin.debug:
+    msg: |
+      ============================================
+      UPGRADED PACKAGES SUMMARY
+      ============================================
+      Hostname: {{ ansible_hostname }} (IP: {{ inventory_hostname }})
+      Total packages changed: {{ apt_result.changed | default(false) }}
+      {% if apt_result is defined and apt_result.changed %}
+      Packages updated: Yes
+      
+      List of upgraded packages:
+      {{ upgradable_packages.stdout }}
+      {% else %}
+      Packages updated: No packages were upgraded
+      {% endif %}
+      ============================================
+
