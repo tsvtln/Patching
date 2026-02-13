@@ -40,6 +40,7 @@
 - name: "ubuntu | Update and upgrade the system"
   ansible.builtin.apt:
     update_cache: yes
+  become: yes
 
 - name: "ubuntu | Install latest apt packages"
   ansible.builtin.apt:
@@ -47,10 +48,12 @@
     state: latest
   when: confirm_update
   register: apt_result
+  become: yes
 
 - name: "ubuntu | Upgrade the kernel"
   ansible.builtin.apt:
     upgrade: dist
+  become: yes
 
 - block:
   - name: "ubuntu | Log if apt update fails"
@@ -78,6 +81,7 @@
   ansible.builtin.reboot:
     reboot_timeout: 300
   when: os_info_pre_update.kernel_version != os_info_post_update.kernel_version
+  become: yes
 
 - block:
   - name: "ubuntu | Make sure the services from the pre-check are running"
@@ -86,6 +90,7 @@
       state: started
     loop: "{{ ansible_facts.services.keys() | list }}"
     register: start_failed
+    become: yes
 
   - name: "ubuntu | Show service restart status"
     ansible.builtin.debug:
@@ -125,3 +130,4 @@
   ansible.builtin.apt:
     autoremove: yes
     autoclean: yes
+  become: yes
