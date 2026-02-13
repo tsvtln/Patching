@@ -6,4 +6,5 @@
 - name: "Patching Linux Ubuntu node {{ hostname }}"
   ansible.builtin.import_tasks: ubuntu.yml
   when: os_name == "Ubuntu" and os_family == "Debian" and ip_address in ubuntu_linux_nodes
+  become: yes
 

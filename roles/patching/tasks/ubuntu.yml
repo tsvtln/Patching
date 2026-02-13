@@ -77,10 +77,18 @@
 - name: "ubuntu | Trigger ansible handlers"
   ansible.builtin.meta: flush_handlers
 
+- name: "ubuntu | Gather facts after update"
+  ansible.builtin.setup:
+    filter: ansible_kernel
+
+- name: "ubuntu | Set post-update kernel info"
+  ansible.builtin.set_fact:
+    post_update_kernel: "{{ ansible_kernel }}"
+
 - name: "ubuntu | Reboot the system if kernel was updated"
   ansible.builtin.reboot:
     reboot_timeout: 300
-  when: os_info_pre_update.kernel_version != os_info_post_update.kernel_version
+  when: os_info_pre_update.kernel_version != post_update_kernel
   become: yes
 
 - block:
@@ -103,7 +111,7 @@
     register: fs_checked
     loop: "{{ dvs }}"
 
-- name: "ubuntu | Gather facts after update"
+- name: "ubuntu | Gather complete facts after update and reboot"
   ansible.builtin.setup:
     filter: ansible_distribution*
 
