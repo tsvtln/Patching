@@ -1,7 +1,7 @@
 ---
-- name: "Patching MediaServer"
-  ansible.builtin.import_tasks: mediaserver.yml
-  when: ip_address == "{{ mediaserver }}"
+#- name: "Patching MediaServer"
+#  ansible.builtin.import_tasks: mediaserver.yml
+#  when: ip_address == "{{ mediaserver }}"
 
 - name: "Patching Linux Ubuntu node {{ hostname }}"
   ansible.builtin.import_tasks: ubuntu.yml
