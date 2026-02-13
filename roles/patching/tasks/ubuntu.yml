@@ -27,6 +27,7 @@
     - hostvars[inventory_hostname]['ansible_%s' | format(item)]['ipv4'] is defined
     - hostvars[inventory_hostname]['ansible_%s' | format(item)]['active'] == true
     - hostvars[inventory_hostname]['ansible_%s' | format(item)]['device'] != 'lo'
+  register: NIC_interface
 
 - name: "ubuntu | Get the IP address for each interface"
   ansible.builtin.debug:
