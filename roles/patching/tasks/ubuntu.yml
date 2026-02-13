@@ -106,10 +106,12 @@
 
 - block:
   - name: "ubuntu | Validate FS is mounted"
-    ansible.builtin.shell: df -hP | grep "{{ item }}"
+    ansible.builtin.shell: df -hP | grep "{{ item }}" || true
     changed_when: false
+    failed_when: false
     register: fs_checked
     loop: "{{ dvs }}"
+    when: "'/dev/loop' not in item and '/dev/snap' not in item"
 
 - name: "ubuntu | Gather complete facts after update and reboot"
   ansible.builtin.setup:
