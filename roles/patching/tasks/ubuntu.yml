@@ -91,18 +91,18 @@
   when: os_info_pre_update.kernel_version != post_update_kernel
   become: yes
 
-- block:
-  - name: "ubuntu | Make sure the services from the pre-check are running"
-    ansible.builtin.service:
-      name: "{{ item }}"
-      state: started
-    loop: "{{ ansible_facts.services.keys() | list }}"
-    register: start_failed
-    become: yes
-
-  - name: "ubuntu | Show service restart status"
-    ansible.builtin.debug:
-      msg: "{{ start_failed }}"
+#- block:
+#  - name: "ubuntu | Make sure the services from the pre-check are running"
+#    ansible.builtin.service:
+#      name: "{{ item }}"
+#      state: started
+#    loop: "{{ ansible_facts.services.keys() | list }}"
+#    register: start_failed
+#    become: yes
+#
+#  - name: "ubuntu | Show service restart status"
+#    ansible.builtin.debug:
+#      msg: "{{ start_failed }}"
 
 - block:
   - name: "ubuntu | Validate FS is mounted"
