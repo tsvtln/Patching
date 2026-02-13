@@ -31,7 +31,7 @@
 
 - name: "ubuntu | Get the IP address for each interface"
   ansible.builtin.debug:
-    msg: "{{ hostvars[inventory_hostname]['ansible_%s' | format(item)]['ipv4']['address'] }}"
+    msg: "{{ hostvars[inventory_hostname]['ansible_%s' | format(item.item)]['ipv4']['address'] }}"
   loop: "{{ NIC_interface['results'] }}"
   when: item.skip_reason is not defined
   register: NIC_IP
