@@ -58,19 +58,19 @@
 - block:
   - name: "ubuntu | Log if apt update fails"
     ansible.builtin.debug:
-      msg: "APT update failed on {{ inventory_hostname }}"
+      msg: "APT update failed on {{ ansible_hostname }} ({{ inventory_hostname }})"
     when: apt_result is defined and apt_result.failed
 
 - block:
   - name: "ubuntu | Nothing to upgrade"
     ansible.builtin.debug:
-      msg: "No packages were upgraded on {{ inventory_hostname }}"
+      msg: "No packages were upgraded on {{ ansible_hostname }} ({{ inventory_hostname }})"
     when: apt_result is defined and apt_result.changed == false
 
 - block:
   - name: "ubuntu | Update is done"
     ansible.builtin.debug:
-      msg: "HOSTNAME: {{ inventory_hostname }} - Update is done"
+      msg: "HOSTNAME: {{ ansible_hostname }} ({{ inventory_hostname }}) - Update is done"
     changed_when: true
   when: apt_result is defined and apt_result is succeeded and apt_result.changed
 
@@ -129,7 +129,7 @@
 - name: "ubuntu | Display post update OS version information"
   ansible.builtin.debug:
     msg: |
-      HOSTNAME: {{ inventory_hostname }} version After the update:
+      HOSTNAME: {{ ansible_hostname }} (IP: {{ inventory_hostname }}) version After the update:
           Distribution: {{ os_info_post_update.distribution }}
           Distribution Major Version: {{ os_info_post_update.distribution_major_version }}
           Distribution Release: {{ os_info_post_update.distribution_release }}
