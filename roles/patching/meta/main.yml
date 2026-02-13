@@ -1,0 +1,18 @@
+galaxy_info:
+  author: tsvtln
+  description: Patching different OS systems
+  company: tsvtln
+  license: GPLv2
+  min_ansible_version: '2.4'
+  galaxy_tags: []
+  platforms:
+    - name: EL
+      versions:
+        - all
+    - name: Ubuntu
+      versions:
+        - all
+    - name: Windows
+      versions:
+        - all
+dependencies: []

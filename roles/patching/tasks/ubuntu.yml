@@ -1,0 +1,126 @@
+---
+- name: "ubuntu | Set pre-update os_info"
+  ansible.builtin.set_fact:
+    os_info_pre_update:
+      distribution: "{{ ansible_distribution }}"
+      distribution_major_version: "{{ ansible_distribution_major_version }}"
+      distribution_version: "{{ ansible_distribution_version }}"
+      distribution_release: "{{ ansible_distribution_release }}"
+      kernel_version: "{{ ansible_kernel }}"
+
+- name: "ubuntu | Return service state information"
+  ansible.builtin.service_facts:
+
+- name: "ubuntu | Display service list"
+  ansible.builtin.debug:
+    msg: "Service list: {{ ansible_facts.services.keys() }}"
+
+- name: "ubuntu | Collect a list of mounted devices"
+  ansible.builtin.set_fact:
+    dvs: "{{ ansible_mounts | map(attribute='device') | list }}"
+
+- name: "ubuntu | Register all system interfaces"
+  ansible.builtin.debug:
+    msg: "{{ item }}"
+  loop: "{{ ansible_interfaces }}"
+  when:
+    - hostvars[inventory_hostname]['ansible_%s' | format(item)]['ipv4'] is defined
+    - hostvars[inventory_hostname]['ansible_%s' | format(item)]['active'] == true
+    - hostvars[inventory_hostname]['ansible_%s' | format(item)]['device'] != 'lo'
+
+- name: "ubuntu | Get the IP address for each interface"
+  ansible.builtin.debug:
+    msg: "{{ hostvars[inventory_hostname]['ansible_%s' | format(item)]['ipv4']['address'] }}"
+  loop: "{{ NIC_interface['results'] }}"
+  when: item.skip_reason is not defined
+  register: NIC_IP
+
+# Run updates
+- name: "ubuntu | Update and upgrade the system"
+  ansible.builtin.apt:
+    update_cache: yes
+
+- name: "ubuntu | Install latest apt packages"
+  ansible.builtin.apt:
+    name: '*'
+    state: latest
+  when: confirm_update
+  register: apt_result
+
+- name: "ubuntu | Upgrade the kernel"
+  ansible.builtin.apt:
+    upgrade: dist
+
+- block:
+  - name: "ubuntu | Log if apt update fails"
+    ansible.builtin.debug:
+      msg: "APT update failed on {{ inventory_hostname }}"
+    when: apt_result is defined and apt_result.failed
+
+- block:
+  - name: "ubuntu | Nothing to upgrade"
+    ansible.builtin.msg:
+      msg: "No packages were upgraded on {{ inventory_hostname }}"
+    when: apt_result is defined and apt_result.changed == false
+
+- block:
+  - name: "ubuntu | Update is done"
+    ansible.builtin.debug:
+      msg: "HOSTNAME: {{ inventory_hostname }} - Update is done"
+    changed_when: true
+  when: apt_result is defined and apt_result is succeeded and apt_result.changed
+
+- name: "ubuntu | Trigger ansible handlers"
+  ansible.builtin.meta: flush_handlers
+
+- name: "ubuntu | Reboot the system if kernel was updated"
+  ansible.builtin.reboot:
+    reboot_timeout: 300
+  when: os_info_pre_update.kernel_version != os_info_post_update.kernel_version
+
+- block:
+  - name: "ubuntu | Make sure the services from the pre-check are running"
+    ansible.builtin.service:
+      name: "{{ item }}"
+      state: started
+    loop: "{{ ansible_facts.services.keys() | list }}"
+    register: start_failed
+
+  - name: "ubuntu | Show service restart status"
+    ansible.builtin.debug:
+      msg: "{{ start_failed }}"
+
+- block:
+  - name: "ubuntu | Validate FS is mounted"
+    ansible.builtin.shell: df -hP | grep "{{ item }}"
+    changed_when: false
+    register: fs_checked
+    loop: "{{ dvs }}"
+
+- name: "ubuntu | Gather facts after update"
+  ansible.builtin.setup:
+    filter: ansible_distribution*
+
+- name: "ubuntu | Set post-update os_info"
+  ansible.builtin.set_fact:
+    os_info_post_update:
+      distribution: "{{ ansible_distribution }}"
+      distribution_major_version: "{{ ansible_distribution_major_version }}"
+      distribution_release: "{{ ansible_distribution_release }}"
+      distribution_version: "{{ ansible_distribution_version }}"
+      kernel_version: "{{ ansible_kernel }}"
+
+- name: "ubuntu | Display post update OS version information"
+  ansible.builtin.debug:
+    msg: |
+      HOSTNAME: {{ inventory_hostname }} version After the update:
+          Distribution: {{ os_info_post_update.distribution }}
+          Distribution Major Version: {{ os_info_post_update.distribution_major_version }}
+          Distribution Release: {{ os_info_post_update.distribution_release }}
+          Distribution Version: {{ os_info_post_update.distribution_version }}
+          Kernel Version: {{ os_info_post_update.kernel_version }}
+
+- name: "ubuntu | Run post-update cleanup"
+  ansible.builtin.apt:
+    autoremove: yes
+    autoclean: yes
