@@ -1,11 +1,11 @@
 ---
 - name: "Patching MediaServer"
   ansible.builtin.import_tasks: mediaserver.yml
-  when: ip_address == "{{ mediaserver }}"
+  when: ip_address == mediaserver
   become: yes
 
-- name: "Patching Linux Ubuntu node {{ hostname }}"
+- name: "Patching Linux Ubuntu/Debian node {{ hostname }}"
   ansible.builtin.import_tasks: ubuntu.yml
-  when: os_name == "Ubuntu" and os_family == "Debian" and ip_address in ubuntu_linux_nodes
+  when: os_family == "Debian" and ip_address in ubuntu_linux_nodes
   become: yes
 
