@@ -41,6 +41,8 @@
   ansible.builtin.apt:
     update_cache: yes
   become: yes
+  environment:
+    DEBIAN_FRONTEND: noninteractive
 
 - name: "ubuntu | Get list of upgradable packages"
   ansible.builtin.shell: apt list --upgradable 2>/dev/null | grep -v "^Listing" || echo "No upgradable packages"
@@ -52,14 +54,22 @@
   ansible.builtin.apt:
     name: '*'
     state: latest
+    force_apt_get: yes
+    dpkg_options: 'force-confdef,force-confold'
   when: confirm_update
   register: apt_result
   become: yes
+  environment:
+    DEBIAN_FRONTEND: noninteractive
 
 - name: "ubuntu | Upgrade the kernel"
   ansible.builtin.apt:
     upgrade: dist
+    force_apt_get: yes
+    dpkg_options: 'force-confdef,force-confold'
   become: yes
+  environment:
+    DEBIAN_FRONTEND: noninteractive
 
 - block:
   - name: "ubuntu | Log if apt update fails"
@@ -158,6 +168,8 @@
     autoremove: yes
     autoclean: yes
   become: yes
+  environment:
+    DEBIAN_FRONTEND: noninteractive
 
 - name: "ubuntu | Display upgraded packages summary"
   ansible.builtin.debug:
