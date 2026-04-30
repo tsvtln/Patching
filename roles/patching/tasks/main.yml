@@ -6,6 +6,5 @@
 
 - name: "Patching Linux Ubuntu/Debian node {{ hostname }}"
   ansible.builtin.import_tasks: ubuntu.yml
-  when: os_family == "Debian" and ip_address in ubuntu_linux_nodes
+  when: os_family == "Debian" and ip_address != mediaserver
   become: yes
-
