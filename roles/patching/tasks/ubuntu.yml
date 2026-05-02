@@ -37,12 +37,35 @@
   register: NIC_IP
 
 # Run updates
+- name: "ubuntu | Wait for apt lock to be released (pre-run check)"
+  ansible.builtin.shell: |
+    timeout 300 bash -c 'until ! fuser /var/lib/apt/lists/lock >/dev/null 2>&1; do sleep 1; done'
+  changed_when: false
+  failed_when: false
+  become: yes
+  environment:
+    DEBIAN_FRONTEND: noninteractive
+
+- name: "ubuntu | Remove stale apt lock file if necessary"
+  ansible.builtin.file:
+    path: /var/lib/apt/lists/lock
+    state: absent
+  become: yes
+  when: ansible_os_family == 'Debian'
+
 - name: "ubuntu | Update and upgrade the system"
   ansible.builtin.apt:
     update_cache: yes
   become: yes
   environment:
     DEBIAN_FRONTEND: noninteractive
+
+- name: "ubuntu | Hold docker packages on Semaphore host (raspberrypi.local)"
+  ansible.builtin.shell: apt-mark hold docker.io docker-ce docker-ce-cli containerd.io docker-compose docker-compose-v2 2>/dev/null || true
+  changed_when: false
+  failed_when: false
+  become: yes
+  when: inventory_hostname in docker_hold
 
 - name: "ubuntu | Get list of upgradable packages"
   ansible.builtin.shell: apt list --upgradable 2>/dev/null | grep -v "^Listing" || echo "No upgradable packages"
@@ -106,7 +129,7 @@
     reboot_timeout: 300
   when:
     - os_info_pre_update.kernel_version != post_update_kernel
-    - inventory_hostname != '10.0.1.6'
+    - inventory_hostname not in docker_hold
   become: yes
 
 - name: "ubuntu | Reboot the system if kernel was updated (safe async reboot for Semaphore host)"
@@ -115,7 +138,7 @@
   poll: 0
   when:
     - os_info_pre_update.kernel_version != post_update_kernel
-    - inventory_hostname == '10.0.1.6'
+    - inventory_hostname == 'raspberrypi.local'
   become: yes
 
 #- block:
@@ -170,6 +193,13 @@
   become: yes
   environment:
     DEBIAN_FRONTEND: noninteractive
+
+- name: "ubuntu | Unhold docker packages on Semaphore host (optional)"
+  ansible.builtin.shell: apt-mark unhold docker.io docker-ce docker-ce-cli containerd.io docker-compose docker-compose-v2 2>/dev/null || true
+  changed_when: false
+  failed_when: false
+  become: yes
+  when: inventory_hostname == 'raspberrypi.local'
 
 - name: "ubuntu | Display upgraded packages summary"
   ansible.builtin.debug:

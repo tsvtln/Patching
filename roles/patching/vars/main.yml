@@ -4,4 +4,5 @@ os_family: "{{ ansible_os_family }}"
 os_version: "{{ ansible_distribution_version }}"
 os_name: "{{ ansible_distribution }}"
 hostname: "{{ ansible_hostname }}"
+docker_hold: ['raspberrypi.local', 'raspberrypi']
 confirm_update: true
