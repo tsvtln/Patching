@@ -10,6 +10,7 @@
 
 - name: "ubuntu | Return service state information"
   ansible.builtin.service_facts:
+  timeout: 60
 
 - name: "ubuntu | Display service list"
   ansible.builtin.debug:
